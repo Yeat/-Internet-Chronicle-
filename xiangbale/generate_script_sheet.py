@@ -262,14 +262,24 @@ def wrap_text(text: str, font_obj: ImageFont.ImageFont, max_width: int, draw: Im
     return lines if lines else [""]
 
 
-def measure_block(ability: str, name: str, fonts: dict, max_w: int, icon: int, gap: int) -> int:
+def measure_block(
+    ability: str,
+    name: str,
+    fonts: dict,
+    max_w: int,
+    icon: int,
+    line_gap: int,
+    name_ability_gap: int = 4,
+) -> int:
+    """Height of one character entry; ability text wraps within max_w."""
     tmp = Image.new("RGB", (8, 8))
     d = ImageDraw.Draw(tmp)
     lines = wrap_text(ability, fonts["ability"], max_w, d)
     na, nd = fonts["name"].getmetrics()
     aa, ad = fonts["ability"].getmetrics()
-    text_h = (na + nd) + 2 + len(lines) * (aa + ad) + max(0, len(lines) - 1) * gap
-    return max(icon, text_h) + 8
+    line_h = aa + ad
+    text_h = (na + nd) + name_ability_gap + len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+    return max(icon, text_h)
 
 
 def load_script():
@@ -317,36 +327,35 @@ def draw_vertical_label(
 
 
 def render() -> Image.Image:
+    """Large-type sheet: maximize fonts, wrap abilities, fill the page."""
     paths = ensure_fonts()
     meta, by_team = load_script()
     img = make_parchment(PAGE_W, PAGE_H)
     draw = ImageDraw.Draw(img, "RGBA")
     draw_scroll_border(draw, PAGE_W, PAGE_H)
 
-    f_title = font(paths["title"], 118)
-    f_sub = font(paths["body"], 19)
-    f_meta = font(paths["body"], 17)
-    f_name = font(paths["title_reg"], 27)
-    f_ability = font(paths["body"], 17)
-    f_bar = font(paths["title"], 30)
+    # Compact header → more room for large body type
+    f_title = font(paths["title"], 96)
+    f_sub = font(paths["body"], 18)
+    f_meta = font(paths["body"], 16)
+    f_bar = font(paths["title"], 34)
     f_footer = font(paths["body"], 14)
-    fonts = {"name": f_name, "ability": f_ability}
 
     title = meta.get("name", "乡巴佬")
     author = meta.get("author", "")
     logo_path = ICON_DIR / "_logo.png"
-    header_top = 70
+    header_top = 56
     if logo_path.exists():
         logo = Image.open(logo_path).convert("RGBA")
-        logo_h = 88
+        logo_h = 70
         logo = logo.resize(
             (max(1, int(logo.size[0] * logo_h / logo.size[1])), logo_h),
             Image.Resampling.LANCZOS,
         )
         img.paste(logo, ((PAGE_W - logo.size[0]) // 2, header_top), logo)
-        title_y = header_top + logo_h - 2
+        title_y = header_top + logo_h - 4
     else:
-        title_y = header_top + 10
+        title_y = header_top
 
     tb = draw.textbbox((0, 0), title, font=f_title)
     tw = tb[2] - tb[0]
@@ -354,90 +363,105 @@ def render() -> Image.Image:
     draw.text((tx + 3, title_y + 3), title, font=f_title, fill=(80, 40, 25, 80))
     draw.text((tx, title_y), title, font=f_title, fill=TITLE_RED)
 
-    sub = "非官方自定义剧本 · UNOFFICIAL CUSTOM SCRIPT"
+    sub = "非官方自定义剧本 · UNOFFICIAL CUSTOM SCRIPT · 大字版"
     sb = draw.textbbox((0, 0), sub, font=f_sub)
     sx = (PAGE_W - (sb[2] - sb[0])) // 2
-    sy = title_y + (tb[3] - tb[1]) + 4
+    sy = title_y + (tb[3] - tb[1]) + 2
     draw.text((sx, sy), sub, font=f_sub, fill=DISCLAIMER)
 
     author_line = f"作者 Author：{author}" if author else ""
-    ay = sy + 26
+    ay = sy + 22
     if author_line:
         ab = draw.textbbox((0, 0), author_line, font=f_meta)
         draw.text(((PAGE_W - (ab[2] - ab[0])) // 2, ay), author_line, font=f_meta, fill=INK_SOFT)
-        content_top = ay + 34
+        content_top = ay + 26
     else:
-        content_top = ay + 8
+        content_top = ay + 6
 
     draw.line([(120, content_top), (PAGE_W - 120, content_top)], fill=(110, 80, 50), width=2)
-    content_top += 16
+    content_top += 10
 
-    margin_right = 52
-    bar_x = 40
-    bar_w = 64  # wider left camp strip like official sheets
-    content_x = bar_x + bar_w + 16
-    gutter = 32
+    margin_right = 46
+    bar_x = 34
+    bar_w = 70
+    content_x = bar_x + bar_w + 12
+    gutter = 26
     col_w = (PAGE_W - content_x - margin_right - gutter) // 2
-    footer_h = 52
+    footer_h = 46
     content_bottom = PAGE_H - footer_h
     available_h = content_bottom - content_top
 
-    icon_size = 56
-    ability_gap = 0
-    row_gap = 5
-
-    def ability_w(isz: int) -> int:
-        return col_w - isz - 14
-
-    def row_h(ch: dict, isz: int, fset: dict) -> int:
-        return measure_block(
-            ch.get("ability", ""),
-            ch.get("name", ""),
-            fset,
-            ability_w(isz),
-            isz,
-            ability_gap,
-        )
-
-    for _ in range(12):
+    def layout_height(name_sz: int, abil_sz: int, icon: int, line_gap: int, row_gap: int, sect_gap: int) -> int:
+        fset = {
+            "name": font(paths["title_reg"], name_sz),
+            "ability": font(paths["body"], abil_sz),
+        }
+        aw = col_w - icon - 14
         total = 0
-        for team in TEAM_ORDER:
-            chars = by_team.get(team, [])
-            if not chars:
-                continue
+        teams_present = [t for t in TEAM_ORDER if by_team.get(t)]
+        for ti, team in enumerate(teams_present):
+            chars = by_team[team]
             left_chars, right_chars = split_columns(chars)
-            left_h = sum(row_h(c, icon_size, fonts) + row_gap for c in left_chars)
-            right_h = sum(row_h(c, icon_size, fonts) + row_gap for c in right_chars)
-            total += max(left_h, right_h) + 14
-        if total <= available_h:
-            break
-        icon_size = max(44, icon_size - 2)
-        f_name = font(paths["title_reg"], max(20, f_name.size - 1))
-        f_ability = font(paths["body"], max(15, f_ability.size - 1))
-        fonts = {"name": f_name, "ability": f_ability}
-        row_gap = max(3, row_gap - 1)
+            left_h = sum(
+                measure_block(c.get("ability", ""), c.get("name", ""), fset, aw, icon, line_gap) + row_gap
+                for c in left_chars
+            )
+            right_h = sum(
+                measure_block(c.get("ability", ""), c.get("name", ""), fset, aw, icon, line_gap) + row_gap
+                for c in right_chars
+            )
+            total += max(left_h, right_h)
+            if ti < len(teams_present) - 1:
+                total += sect_gap
+        return total
 
-    for _ in range(5):
-        trial_ability = font(paths["body"], f_ability.size + 1)
-        trial_fonts = {"name": f_name, "ability": trial_ability}
-        trial_gap = row_gap + 1
-        total = 0
-        for team in TEAM_ORDER:
-            chars = by_team.get(team, [])
-            if not chars:
-                continue
-            left_chars, right_chars = split_columns(chars)
-            left_h = sum(row_h(c, icon_size, trial_fonts) + trial_gap for c in left_chars)
-            right_h = sum(row_h(c, icon_size, trial_fonts) + trial_gap for c in right_chars)
-            total += max(left_h, right_h) + 14
-        if total <= available_h:
-            f_ability = trial_ability
-            fonts = trial_fonts
-            row_gap = trial_gap
+    # Binary search largest ability font that still fits (wrapping allowed)
+    lo, hi = 18, 40
+    best = (24, 34, 70, 2, 10, 18)
+    while lo <= hi:
+        abil = (lo + hi) // 2
+        name_sz = abil + 12
+        icon = max(56, int(abil * 2.9))
+        line_gap = max(2, abil // 8)
+        row_gap = max(8, abil // 2 + 2)
+        sect_gap = max(14, abil + 2)
+        h = layout_height(name_sz, abil, icon, line_gap, row_gap, sect_gap)
+        if h <= available_h:
+            best = (abil, name_sz, icon, line_gap, row_gap, sect_gap)
+            lo = abil + 1
         else:
-            break
+            hi = abil - 1
 
-    amw = ability_w(icon_size)
+    abil_sz, name_sz, icon_size, line_gap, row_gap, sect_gap = best
+    fonts = {
+        "name": font(paths["title_reg"], name_sz),
+        "ability": font(paths["body"], abil_sz),
+    }
+    used = layout_height(name_sz, abil_sz, icon_size, line_gap, row_gap, sect_gap)
+    print(
+        f"Large-type: ability={abil_sz}px name={name_sz}px icon={icon_size} "
+        f"used={used}/{available_h}"
+    )
+
+    # Stretch leftover vertical space into gaps so the page is filled
+    spare = available_h - used
+    row_slots = 0
+    for team in TEAM_ORDER:
+        chars = by_team.get(team, [])
+        if not chars:
+            continue
+        left_chars, right_chars = split_columns(chars)
+        row_slots += max(len(left_chars), len(right_chars))
+    if spare > 6 and row_slots > 0:
+        row_gap += spare // row_slots
+        used2 = layout_height(name_sz, abil_sz, icon_size, line_gap, row_gap, sect_gap)
+        spare2 = available_h - used2
+        n_sect = max(1, sum(1 for t in TEAM_ORDER if by_team.get(t)) - 1)
+        if spare2 > 4:
+            sect_gap += spare2 // n_sect
+        print(f"Fill stretch: row_gap={row_gap} sect_gap={sect_gap}")
+
+    amw = col_w - icon_size - 14
     section_spans: list[tuple[str, int, int]] = []
 
     def draw_char(ch: dict, x: int, y: int) -> int:
@@ -454,33 +478,38 @@ def render() -> Image.Image:
             ImageDraw.Draw(icon).ellipse(
                 [2, 2, icon_size - 3, icon_size - 3],
                 outline=(*tint, 255),
-                width=2,
+                width=3,
             )
 
-        text_x = x + icon_size + 10
+        text_x = x + icon_size + 12
         draw.text((text_x, y), name, font=fonts["name"], fill=NAME_COLOR[team])
         na, nd = fonts["name"].getmetrics()
         name_h = na + nd
         lines = wrap_text(ability, fonts["ability"], amw, draw)
         aa, ad = fonts["ability"].getmetrics()
         line_h = aa + ad
-        ay0 = y + name_h + 1
+        ay0 = y + name_h + 4
         for i, line in enumerate(lines):
-            draw.text((text_x, ay0 + i * (line_h + ability_gap)), line, font=fonts["ability"], fill=INK)
-        text_h = name_h + 1 + len(lines) * line_h + max(0, len(lines) - 1) * ability_gap
-        rh = max(icon_size, text_h) + row_gap
-        icon_y = y + max(0, (rh - row_gap - icon_size) // 2)
+            draw.text(
+                (text_x, ay0 + i * (line_h + line_gap)),
+                line,
+                font=fonts["ability"],
+                fill=INK,
+            )
+        text_h = name_h + 4 + len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+        content_h = max(icon_size, text_h)
+        rh = content_h + row_gap
+        icon_y = y + max(0, (content_h - icon_size) // 2)
         img.paste(icon, (x, icon_y), icon)
         return rh
 
     y = content_top
     left_x = content_x
     right_x = content_x + col_w + gutter
+    teams_present = [t for t in TEAM_ORDER if by_team.get(t)]
 
-    for team in TEAM_ORDER:
-        chars = by_team.get(team, [])
-        if not chars:
-            continue
+    for ti, team in enumerate(teams_present):
+        chars = by_team[team]
         left_chars, right_chars = split_columns(chars)
         y0 = y
         y_left = y
@@ -492,20 +521,19 @@ def render() -> Image.Image:
         y = max(y_left, y_right)
         section_spans.append((team, y0, y))
 
-        if team != TEAM_ORDER[-1]:
-            rule_y = y + 2
+        if ti < len(teams_present) - 1:
+            rule_y = y + max(2, sect_gap // 3)
             draw.line(
                 [(content_x, rule_y), (PAGE_W - margin_right, rule_y)],
                 fill=(100, 72, 45, 180),
                 width=2,
             )
-            # small diamond at rule center (official flourish)
             mid = (content_x + PAGE_W - margin_right) // 2
             draw.polygon(
-                [(mid, rule_y - 4), (mid + 5, rule_y), (mid, rule_y + 4), (mid - 5, rule_y)],
+                [(mid, rule_y - 5), (mid + 6, rule_y), (mid, rule_y + 5), (mid - 6, rule_y)],
                 fill=(100, 72, 45, 200),
             )
-            y = rule_y + 10
+            y = rule_y + max(8, sect_gap - sect_gap // 3)
 
     if section_spans:
         bar_top = section_spans[0][1] - 4
@@ -522,19 +550,12 @@ def render() -> Image.Image:
         for team, y0, y1 in section_spans:
             color = TEAM_BAR[team]
             seg_h = max(1, y1 - y0)
-            # Full-width colored camp segment
             seg = Image.new("RGBA", (bar_w - 6, seg_h), (*color, 245))
             img.paste(seg, (bar_x + 3, y0), seg)
-            # Metallic edge
             ImageDraw.Draw(img).line(
                 [(bar_x + 4, y0 + 2), (bar_x + 4, y1 - 2)],
                 fill=(255, 245, 220, 90),
                 width=2,
-            )
-            ImageDraw.Draw(img).line(
-                [(bar_x + bar_w - 4, y0 + 2), (bar_x + bar_w - 4, y1 - 2)],
-                fill=(0, 0, 0, 50),
-                width=1,
             )
             draw_vertical_label(
                 img,
@@ -550,11 +571,12 @@ def render() -> Image.Image:
             width=3,
         )
 
-    footer = "Blood on the Clocktower 非官方自定义剧本单 · 名称与能力原文取自 JSON · 仅供同好娱乐"
+    footer = "Blood on the Clocktower 非官方自定义剧本单 · 大字版 · 名称与能力原文取自 JSON · 仅供同好娱乐"
     fb = draw.textbbox((0, 0), footer, font=f_footer)
-    draw.text(((PAGE_W - (fb[2] - fb[0])) // 2, PAGE_H - 44), footer, font=f_footer, fill=DISCLAIMER)
+    draw.text(((PAGE_W - (fb[2] - fb[0])) // 2, PAGE_H - 38), footer, font=f_footer, fill=DISCLAIMER)
 
     return img.convert("RGB")
+
 
 
 def export_pdf(png_path: Path, pdf_path: Path) -> None:
