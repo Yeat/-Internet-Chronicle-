@@ -9,9 +9,9 @@
 | `output/乡巴佬_剧本单.png` | 角色表 A4 @ 300DPI（大字铺满） |
 | `output/乡巴佬_剧本单_HD.png` | 角色表高清导出 |
 | `output/乡巴佬_剧本单_A4.pdf` | 角色表 A4 打印 PDF |
-| `output/乡巴佬_夜晚顺序.png` | 夜晚顺序横版 A4 @ 300DPI |
+| `output/乡巴佬_夜晚顺序.png` | 夜晚顺序竖版 A4 @ 300DPI（大字铺满） |
 | `output/乡巴佬_夜晚顺序_HD.png` | 夜晚顺序高清导出 |
-| `output/乡巴佬_夜晚顺序_A4.pdf` | 夜晚顺序横向 A4 PDF |
+| `output/乡巴佬_夜晚顺序_A4.pdf` | 夜晚顺序竖版 A4 PDF |
 
 ## 重新生成
 
