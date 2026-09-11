@@ -1,14 +1,24 @@
 #!/usr/bin/env python3
-"""Generate Blood on the Clocktower style custom script sheet for 《乡巴佬》."""
+"""Official Trouble Brewing–style custom script sheet for 《乡巴佬》."""
 
 from __future__ import annotations
 
 import json
+import math
 import random
 import urllib.request
+import zipfile
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import (
+    Image,
+    ImageChops,
+    ImageDraw,
+    ImageEnhance,
+    ImageFilter,
+    ImageFont,
+    ImageOps,
+)
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas as pdf_canvas
@@ -21,8 +31,8 @@ OUT_DIR = ROOT / "output"
 ARTIFACT_DIR = Path("/opt/cursor/artifacts")
 
 DPI = 300
-PAGE_W = int(210 / 25.4 * DPI)  # 2480
-PAGE_H = int(297 / 25.4 * DPI)  # 3508
+PAGE_W = int(210 / 25.4 * DPI)
+PAGE_H = int(297 / 25.4 * DPI)
 
 TEAM_ORDER = ["townsfolk", "outsider", "minion", "demon", "fabled"]
 TEAM_LABEL = {
@@ -30,49 +40,28 @@ TEAM_LABEL = {
     "outsider": "外来者",
     "minion": "爪牙",
     "demon": "恶魔",
-    "fabled": "传奇角色",
-}
-TEAM_LABEL_EN = {
-    "townsfolk": "TOWNSFOLK",
-    "outsider": "OUTSIDERS",
-    "minion": "MINIONS",
-    "demon": "DEMONS",
-    "fabled": "FABLED",
+    "fabled": "传奇",
 }
 TEAM_COLOR = {
-    "townsfolk": (36, 92, 148),
-    "outsider": (42, 118, 158),
-    "minion": (168, 42, 48),
-    "demon": (148, 24, 28),
-    "fabled": (158, 112, 28),
+    "townsfolk": (40, 78, 128),
+    "outsider": (55, 105, 145),
+    "minion": (150, 48, 42),
+    "demon": (120, 28, 30),
+    "fabled": (150, 108, 28),
 }
 TEAM_BAR = {
-    "townsfolk": (46, 108, 168),
-    "outsider": (52, 132, 172),
-    "minion": (178, 48, 54),
-    "demon": (158, 28, 32),
-    "fabled": (186, 138, 42),
+    "townsfolk": (48, 88, 138),
+    "outsider": (70, 120, 155),
+    "minion": (165, 58, 48),
+    "demon": (125, 32, 34),
+    "fabled": (175, 130, 40),
 }
-TEAM_HEADER_BG = {
-    "townsfolk": (42, 102, 162, 48),
-    "outsider": (52, 132, 172, 48),
-    "minion": (178, 48, 54, 48),
-    "demon": (158, 28, 32, 48),
-    "fabled": (186, 138, 42, 55),
-}
-NAME_COLOR = {
-    "townsfolk": (28, 78, 132),
-    "outsider": (30, 100, 140),
-    "minion": (148, 32, 38),
-    "demon": (128, 18, 22),
-    "fabled": (128, 90, 18),
-}
+NAME_COLOR = TEAM_COLOR
+INK = (42, 32, 24)
+INK_SOFT = (85, 65, 45)
+DISCLAIMER = (115, 80, 50)
+TITLE_RED = (120, 36, 28)
 
-INK = (46, 34, 22)
-INK_SOFT = (78, 60, 40)
-DISCLAIMER = (110, 78, 48)
-
-# Fallback when JSON CDN is dead (猫猫军团)
 ICON_FALLBACKS = {
     "maomaojuntuan_juanbing": (
         "https://patchwiki.biligame.com/images/jbzlbwgwjcygf/"
@@ -81,15 +70,11 @@ ICON_FALLBACKS = {
 }
 
 
-def load_font(path: Path, size: int) -> ImageFont.FreeTypeFont:
-    return ImageFont.truetype(str(path), size=size)
-
-
-def _download(url: str, dest: Path, timeout: float = 60.0) -> None:
+def download(url: str, dest: Path, timeout: float = 60.0) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        dest.write_bytes(r.read())
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        dest.write_bytes(resp.read())
 
 
 def ensure_fonts() -> dict[str, Path]:
@@ -102,123 +87,133 @@ def ensure_fonts() -> dict[str, Path]:
     if not body.exists():
         try:
             print("Downloading LXGW WenKai ...")
-            _download(
+            download(
                 "https://github.com/lxgw/LxgwWenKai/releases/download/v1.501/LXGWWenKai-Regular.ttf",
                 body,
             )
-        except Exception as e:
-            print(f"Font download failed ({e}); using system fallback")
+        except Exception as exc:
+            print(f"WenKai download failed ({exc})")
 
     if not title.exists() or not title_reg.exists():
         zip_path = FONT_DIR / "NotoSerifCJKsc.zip"
         try:
             print("Downloading Noto Serif CJK SC ...")
-            _download(
+            download(
                 "https://github.com/googlefonts/noto-cjk/releases/download/Serif2.003/09_NotoSerifCJKsc.zip",
                 zip_path,
             )
-            import zipfile
             with zipfile.ZipFile(zip_path) as zf:
-                for member, dest in [
-                    ("OTF/SimplifiedChinese/NotoSerifCJKsc-Bold.otf", title),
-                    ("OTF/SimplifiedChinese/NotoSerifCJKsc-SemiBold.otf", title_reg),
+                names = zf.namelist()
+                for base, dest in [
+                    ("NotoSerifCJKsc-Bold.otf", title),
+                    ("NotoSerifCJKsc-SemiBold.otf", title_reg),
                 ]:
-                    if not dest.exists():
-                        dest.write_bytes(zf.read(member))
+                    hit = next((n for n in names if n.endswith(base)), None)
+                    if hit:
+                        dest.write_bytes(zf.read(hit))
             zip_path.unlink(missing_ok=True)
-        except Exception as e:
-            print(f"Noto Serif download failed ({e}); using WenKai/system fallback")
+        except Exception as exc:
+            print(f"Noto Serif download failed ({exc})")
             zip_path.unlink(missing_ok=True)
 
     body_path = body if body.exists() else fallback
-    title_path = title if title.exists() else body_path
-    title_reg_path = title_reg if title_reg.exists() else body_path
-    return {"title": title_path, "title_reg": title_reg_path, "body": body_path}
-
-
-def fonts(sizes: dict[str, int] | None = None):
-    paths = ensure_fonts()
-    sizes = sizes or {
-        "title": 112,
-        "section": 32,
-        "section_en": 17,
-        "name": 27,
-        "ability": 19,
-        "meta": 21,
-        "disclaimer": 17,
-        "footer": 15,
-    }
     return {
-        "title": load_font(paths["title"], sizes["title"]),
-        "section": load_font(paths["title"], sizes["section"]),
-        "section_en": load_font(paths["title_reg"], sizes["section_en"]),
-        "name": load_font(paths["title_reg"], sizes["name"]),
-        "ability": load_font(paths["body"], sizes["ability"]),
-        "meta": load_font(paths["body"], sizes["meta"]),
-        "disclaimer": load_font(paths["body"], sizes["disclaimer"]),
-        "footer": load_font(paths["body"], sizes["footer"]),
-        "_sizes": sizes,
-        "_paths": paths,
+        "title": title if title.exists() else body_path,
+        "title_reg": title_reg if title_reg.exists() else body_path,
+        "body": body_path,
     }
+
+
+def font(path: Path, size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(str(path), size=size)
 
 
 def make_parchment(w: int, h: int) -> Image.Image:
-    """Visible parchment texture that stays readable under text."""
-    rng = random.Random(42)
-    base = Image.new("RGB", (w, h), (228, 208, 170))
+    rng = random.Random(7)
+    base = Image.new("RGB", (w, h), (226, 206, 164))
 
-    small = Image.new("RGBA", (max(1, w // 3), max(1, h // 3)), (0, 0, 0, 0))
+    small = Image.new("RGBA", (max(1, w // 4), max(1, h // 4)), (0, 0, 0, 0))
     sd = ImageDraw.Draw(small)
-    for _ in range(180):
+    for _ in range(160):
         cx, cy = rng.randint(0, small.size[0]), rng.randint(0, small.size[1])
-        rw, rh = rng.randint(10, 100), rng.randint(8, 70)
+        rw, rh = rng.randint(8, 90), rng.randint(6, 60)
         tone = rng.choice(
             [
-                (205, 175, 125),
-                (185, 145, 95),
-                (238, 222, 190),
-                (195, 165, 115),
-                (170, 135, 90),
-                (215, 190, 145),
+                (200, 170, 120),
+                (180, 140, 90),
+                (235, 220, 185),
+                (165, 130, 85),
+                (210, 185, 140),
             ]
         )
-        a = rng.randint(22, 50)
-        sd.ellipse([cx - rw, cy - rh, cx + rw, cy + rh], fill=(*tone, a))
+        sd.ellipse([cx - rw, cy - rh, cx + rw, cy + rh], fill=(*tone, rng.randint(20, 48)))
     blotch = small.resize((w, h), Image.Resampling.LANCZOS)
 
     overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     od = ImageDraw.Draw(overlay)
-    for i in range(120):
-        a = int(40 * (1 - i / 120))
-        od.rectangle([i, i, w - 1 - i, h - 1 - i], outline=(112, 78, 40, a))
-    for cx, cy in [(90, 100), (w - 110, 130), (130, h - 120), (w - 100, h - 140)]:
-        od.ellipse([cx - 180, cy - 110, cx + 180, cy + 110], fill=(155, 115, 65, 28))
+    for i in range(140):
+        a = int(48 * (1 - i / 140))
+        od.rectangle([i, i, w - 1 - i, h - 1 - i], outline=(105, 72, 38, a))
+    for cx, cy in [(100, 110), (w - 120, 140), (140, h - 130), (w - 110, h - 150)]:
+        od.ellipse([cx - 200, cy - 120, cx + 200, cy + 120], fill=(150, 110, 60, 30))
 
-    grain = Image.effect_noise((w, h), 32).convert("L")
-    grain_rgb = Image.merge("RGB", (grain, grain, grain))
-    base = Image.blend(base, grain_rgb, 0.11)
-    base = base.convert("RGBA")
+    grain = Image.effect_noise((w, h), 30).convert("L")
+    base = Image.blend(base, Image.merge("RGB", (grain, grain, grain)), 0.10).convert("RGBA")
     base = Image.alpha_composite(base, blotch)
     base = Image.alpha_composite(base, overlay)
 
-    line_layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    ld = ImageDraw.Draw(line_layer)
-    for y in range(0, h, 5):
-        ld.line([(0, y), (w, y)], fill=(140, 110, 70, 14))
-    for _ in range(70):
-        y = rng.randint(0, h - 1)
-        x0 = rng.randint(0, w // 3)
-        x1 = rng.randint(2 * w // 3, w)
-        ld.line(
-            [(x0, y), (x1, y + rng.randint(-2, 2))],
-            fill=(125, 90, 50, rng.randint(14, 26)),
-            width=1,
-        )
-    base = Image.alpha_composite(base, line_layer)
-    return base.filter(ImageFilter.GaussianBlur(0.3)).convert("RGB")
+    star = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    st = ImageDraw.Draw(star)
+    for _ in range(220):
+        x, y = rng.randint(40, w - 40), rng.randint(40, h - 40)
+        r = rng.choice([1, 1, 1, 2, 2, 3])
+        a = rng.randint(18, 55)
+        col = (255, 245, 220, a) if rng.random() > 0.35 else (120, 90, 50, a // 2)
+        st.ellipse([x - r, y - r, x + r, y + r], fill=col)
+        if r >= 2 and rng.random() > 0.6:
+            st.line([(x - r - 1, y), (x + r + 1, y)], fill=col, width=1)
+            st.line([(x, y - r - 1), (x, y + r + 1)], fill=col, width=1)
+    base = Image.alpha_composite(base, star)
+
+    fiber = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    fd = ImageDraw.Draw(fiber)
+    for y in range(0, h, 6):
+        fd.line([(0, y), (w, y)], fill=(140, 110, 70, 10))
+    base = Image.alpha_composite(base, fiber)
+    return base.filter(ImageFilter.GaussianBlur(0.25)).convert("RGB")
 
 
-def circular_icon(path: Path, size: int, ring_rgb: tuple[int, int, int]) -> Image.Image:
+def draw_scroll_border(draw: ImageDraw.ImageDraw, w: int, h: int) -> None:
+    color = (95, 70, 45)
+
+    def flourish(cy: int) -> None:
+        draw.ellipse([w // 2 - 18, cy - 18, w // 2 + 18, cy + 18], outline=color, width=2)
+        draw.ellipse([w // 2 - 8, cy - 8, w // 2 + 8, cy + 8], outline=color, width=1)
+        for sign in (-1, 1):
+            x0 = w // 2 + sign * 30
+            pts = [(x0 + sign * i, cy + math.sin(i / 28) * 10) for i in range(0, 280, 4)]
+            draw.line(pts, fill=color, width=2)
+            tip_x = x0 + sign * 270
+            draw.polygon(
+                [
+                    (tip_x, cy),
+                    (tip_x - sign * 14, cy - 10),
+                    (tip_x - sign * 8, cy),
+                    (tip_x - sign * 14, cy + 10),
+                ],
+                outline=color,
+            )
+        for cx in (70, w - 70):
+            draw.arc([cx - 40, cy - 28, cx + 40, cy + 28], 200, 340, fill=color, width=2)
+
+    flourish(48)
+    flourish(h - 52)
+    for i, a in enumerate([140, 70, 35]):
+        inset = 22 + i * 3
+        draw.rectangle([inset, inset, w - inset, h - inset], outline=(100, 72, 42, a), width=2)
+
+
+def tinted_icon(path: Path, size: int, tint: tuple[int, int, int]) -> Image.Image:
     im = Image.open(path).convert("RGBA")
     bbox = im.getbbox()
     if bbox:
@@ -226,48 +221,55 @@ def circular_icon(path: Path, size: int, ring_rgb: tuple[int, int, int]) -> Imag
     side = max(im.size)
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     canvas.paste(im, ((side - im.size[0]) // 2, (side - im.size[1]) // 2), im)
-    canvas = canvas.resize((size - 10, size - 10), Image.Resampling.LANCZOS)
+    canvas = canvas.resize((size, size), Image.Resampling.LANCZOS)
 
+    r, g, b, a = canvas.split()
+    gray = ImageOps.grayscale(canvas)
+    inv = ImageOps.invert(gray)
+    ink = ImageEnhance.Contrast(inv).enhance(1.6)
+    ink = ImageEnhance.Brightness(ink).enhance(1.15)
+    alpha = ImageChops.multiply(a, ink)
+
+    color_layer = Image.new("RGBA", (size, size), (*tint, 255))
     out = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    mask = Image.new("L", (size - 10, size - 10), 0)
-    ImageDraw.Draw(mask).ellipse([0, 0, size - 11, size - 11], fill=255)
-    under = Image.new("RGBA", (size - 10, size - 10), (245, 232, 200, 255))
-    under.paste(canvas, (0, 0), mask)
-    out.paste(under, (5, 5), mask)
-    d = ImageDraw.Draw(out)
-    d.ellipse([1, 1, size - 2, size - 2], outline=(*ring_rgb, 255), width=5)
-    d.ellipse([5, 5, size - 6, size - 6], outline=(255, 245, 220, 200), width=2)
-    return out
+    out.paste(color_layer, (0, 0), alpha)
+
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse([1, 1, size - 2, size - 2], fill=255)
+    clipped = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    clipped.paste(out, (0, 0), mask)
+    return clipped
 
 
-def wrap_text(text: str, font: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
+def wrap_text(text: str, font_obj: ImageFont.ImageFont, max_width: int, draw: ImageDraw.ImageDraw) -> list[str]:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     lines: list[str] = []
     for para in text.split("\n"):
         if para == "":
             lines.append("")
             continue
-        current = ""
+        cur = ""
         for ch in para:
-            trial = current + ch
-            if draw.textlength(trial, font=font) <= max_width:
-                current = trial
+            trial = cur + ch
+            if draw.textlength(trial, font=font_obj) <= max_width:
+                cur = trial
             else:
-                if current:
-                    lines.append(current)
-                current = ch
-        if current:
-            lines.append(current)
+                if cur:
+                    lines.append(cur)
+                cur = ch
+        if cur:
+            lines.append(cur)
     return lines if lines else [""]
 
 
-def measure_ability(ability: str, font, max_width: int, line_gap: int) -> int:
-    tmp = Image.new("RGB", (10, 10))
-    draw = ImageDraw.Draw(tmp)
-    lines = wrap_text(ability, font, max_width, draw)
-    ascent, descent = font.getmetrics()
-    line_h = ascent + descent
-    return len(lines) * line_h + max(0, len(lines) - 1) * line_gap
+def measure_block(ability: str, name: str, fonts: dict, max_w: int, icon: int, gap: int) -> int:
+    tmp = Image.new("RGB", (8, 8))
+    d = ImageDraw.Draw(tmp)
+    lines = wrap_text(ability, fonts["ability"], max_w, d)
+    na, nd = fonts["name"].getmetrics()
+    aa, ad = fonts["ability"].getmetrics()
+    text_h = (na + nd) + 2 + len(lines) * (aa + ad) + max(0, len(lines) - 1) * gap
+    return max(icon, text_h) + 8
 
 
 def load_script():
@@ -276,231 +278,295 @@ def load_script():
     chars = [c for c in data[1:] if c.get("id") != "_meta"]
     by_team: dict[str, list] = {t: [] for t in TEAM_ORDER}
     for c in chars:
-        team = c.get("team", "townsfolk")
-        by_team.setdefault(team, []).append(c)
+        by_team.setdefault(c.get("team", "townsfolk"), []).append(c)
     return meta, by_team
 
 
-def draw_ornament_line(draw: ImageDraw.ImageDraw, x0: int, x1: int, y: int, color=(140, 100, 55)):
-    mid = (x0 + x1) // 2
-    draw.line([(x0, y), (mid - 24, y)], fill=color, width=2)
-    draw.line([(mid + 24, y), (x1, y)], fill=color, width=2)
-    draw.polygon([(mid, y - 6), (mid + 8, y), (mid, y + 6), (mid - 8, y)], fill=color)
+def split_columns(items: list) -> tuple[list, list]:
+    mid = (len(items) + 1) // 2
+    return items[:mid], items[mid:]
+
+
+def draw_vertical_label(
+    base: Image.Image,
+    text: str,
+    box: tuple[int, int, int, int],
+    font_obj: ImageFont.FreeTypeFont,
+    fill: tuple[int, int, int],
+) -> None:
+    x0, y0, x1, y1 = box
+    tmp = Image.new("RGBA", (900, 900), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tmp)
+    bbox = td.textbbox((0, 0), text, font=font_obj)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    td.text((-bbox[0], -bbox[1]), text, font=font_obj, fill=(*fill, 255))
+    cropped = tmp.crop((0, 0, tw + 1, th + 1)).rotate(90, expand=True)
+    bw, bh = x1 - x0, y1 - y0
+    rw, rh = cropped.size
+    # Scale down if segment is short
+    if rh > bh - 8 or rw > bw - 4:
+        scale = min((bh - 8) / max(1, rh), (bw - 4) / max(1, rw), 1.0)
+        cropped = cropped.resize(
+            (max(1, int(rw * scale)), max(1, int(rh * scale))),
+            Image.Resampling.LANCZOS,
+        )
+        rw, rh = cropped.size
+    px = x0 + max(0, (bw - rw) // 2)
+    py = y0 + max(0, (bh - rh) // 2)
+    base.paste(cropped, (px, py), cropped)
 
 
 def render() -> Image.Image:
+    paths = ensure_fonts()
     meta, by_team = load_script()
     img = make_parchment(PAGE_W, PAGE_H)
     draw = ImageDraw.Draw(img, "RGBA")
+    draw_scroll_border(draw, PAGE_W, PAGE_H)
 
-    margin_x = 64
-    margin_top = 42
-    margin_bottom = 58
-    gutter = 32
-    col_w = (PAGE_W - margin_x * 2 - gutter) // 2
+    f_title = font(paths["title"], 118)
+    f_sub = font(paths["body"], 19)
+    f_meta = font(paths["body"], 17)
+    f_name = font(paths["title_reg"], 27)
+    f_ability = font(paths["body"], 17)
+    f_bar = font(paths["title"], 30)
+    f_footer = font(paths["body"], 14)
+    fonts = {"name": f_name, "ability": f_ability}
 
-    # Header
     title = meta.get("name", "乡巴佬")
     author = meta.get("author", "")
     logo_path = ICON_DIR / "_logo.png"
-    logo_h = 96
-    title_y = margin_top
+    header_top = 70
     if logo_path.exists():
         logo = Image.open(logo_path).convert("RGBA")
-        ratio = logo_h / logo.size[1]
-        logo = logo.resize((max(1, int(logo.size[0] * ratio)), logo_h), Image.Resampling.LANCZOS)
-        img.paste(logo, ((PAGE_W - logo.size[0]) // 2, margin_top), logo)
-        title_y = margin_top + logo_h + 2
+        logo_h = 88
+        logo = logo.resize(
+            (max(1, int(logo.size[0] * logo_h / logo.size[1])), logo_h),
+            Image.Resampling.LANCZOS,
+        )
+        img.paste(logo, ((PAGE_W - logo.size[0]) // 2, header_top), logo)
+        title_y = header_top + logo_h - 2
+    else:
+        title_y = header_top + 10
 
-    # Fit typography / icons to page height
-    sizes = {
-        "title": 112,
-        "section": 32,
-        "section_en": 17,
-        "name": 27,
-        "ability": 19,
-        "meta": 21,
-        "disclaimer": 17,
-        "footer": 15,
-    }
-    icon_size = 68
-    bar_w = 14
-    row_pad_y = 5
-    section_pad = 8
-    ability_line_gap = 1
-    header_h = 38
+    tb = draw.textbbox((0, 0), title, font=f_title)
+    tw = tb[2] - tb[0]
+    tx = (PAGE_W - tw) // 2
+    draw.text((tx + 3, title_y + 3), title, font=f_title, fill=(80, 40, 25, 80))
+    draw.text((tx, title_y), title, font=f_title, fill=TITLE_RED)
 
-    F = fonts(sizes)
-    title_bbox = draw.textbbox((0, 0), title, font=F["title"])
-    tw = title_bbox[2] - title_bbox[0]
-    title_x = (PAGE_W - tw) // 2
-    draw.text((title_x + 3, title_y + 3), title, font=F["title"], fill=(120, 90, 50, 90))
-    draw.text((title_x, title_y), title, font=F["title"], fill=(88, 42, 14))
-
-    subtitle = "非官方自定义剧本 · UNOFFICIAL CUSTOM SCRIPT"
-    sb = draw.textbbox((0, 0), subtitle, font=F["disclaimer"])
+    sub = "非官方自定义剧本 · UNOFFICIAL CUSTOM SCRIPT"
+    sb = draw.textbbox((0, 0), sub, font=f_sub)
     sx = (PAGE_W - (sb[2] - sb[0])) // 2
-    sy = title_y + (title_bbox[3] - title_bbox[1]) + 6
-    draw.text((sx, sy), subtitle, font=F["disclaimer"], fill=DISCLAIMER)
+    sy = title_y + (tb[3] - tb[1]) + 4
+    draw.text((sx, sy), sub, font=f_sub, fill=DISCLAIMER)
 
     author_line = f"作者 Author：{author}" if author else ""
+    ay = sy + 26
     if author_line:
-        ab = draw.textbbox((0, 0), author_line, font=F["meta"])
-        ax = (PAGE_W - (ab[2] - ab[0])) // 2
-        ay = sy + 24
-        draw.text((ax, ay), author_line, font=F["meta"], fill=INK_SOFT)
-        header_bottom = ay + 28
+        ab = draw.textbbox((0, 0), author_line, font=f_meta)
+        draw.text(((PAGE_W - (ab[2] - ab[0])) // 2, ay), author_line, font=f_meta, fill=INK_SOFT)
+        content_top = ay + 34
     else:
-        header_bottom = sy + 28
+        content_top = ay + 8
 
-    draw_ornament_line(draw, margin_x + 40, PAGE_W - margin_x - 40, header_bottom + 4)
-    content_top = header_bottom + 20
-    available_h = PAGE_H - content_top - margin_bottom - 20
+    draw.line([(120, content_top), (PAGE_W - 120, content_top)], fill=(110, 80, 50), width=2)
+    content_top += 16
 
-    left_teams = ["townsfolk"]
-    right_teams = ["outsider", "minion", "demon", "fabled"]
+    margin_right = 52
+    bar_x = 40
+    bar_w = 64  # wider left camp strip like official sheets
+    content_x = bar_x + bar_w + 16
+    gutter = 32
+    col_w = (PAGE_W - content_x - margin_right - gutter) // 2
+    footer_h = 52
+    content_bottom = PAGE_H - footer_h
+    available_h = content_bottom - content_top
 
-    def ability_max_w(isz: int) -> int:
-        return col_w - bar_w - 16 - isz - 12
+    icon_size = 56
+    ability_gap = 0
+    row_gap = 5
 
-    def section_height(team: str, F_, isz: int, rpad: int) -> int:
-        chars = by_team.get(team, [])
-        if not chars:
-            return 0
-        h = header_h
-        amw = ability_max_w(isz)
-        for c in chars:
-            ability_h = measure_ability(c.get("ability", ""), F_["ability"], amw, ability_line_gap)
-            name_h = F_["name"].getmetrics()[0] + F_["name"].getmetrics()[1]
-            row_h = max(isz, name_h + 2 + ability_h) + rpad
-            h += row_h
-        return h + section_pad
+    def ability_w(isz: int) -> int:
+        return col_w - isz - 14
 
-    # Shrink until both columns fit
-    for _ in range(10):
-        left_h = sum(section_height(t, F, icon_size, row_pad_y) for t in left_teams)
-        right_h = sum(section_height(t, F, icon_size, row_pad_y) for t in right_teams)
-        if max(left_h, right_h) <= available_h:
-            break
-        icon_size = max(50, icon_size - 2)
-        sizes["name"] = max(22, sizes["name"] - 1)
-        sizes["ability"] = max(16, sizes["ability"] - 1)
-        sizes["section"] = max(26, sizes["section"] - 1)
-        F = fonts(sizes)
-        row_pad_y = max(3, row_pad_y - 1)
+    def row_h(ch: dict, isz: int, fset: dict) -> int:
+        return measure_block(
+            ch.get("ability", ""),
+            ch.get("name", ""),
+            fset,
+            ability_w(isz),
+            isz,
+            ability_gap,
+        )
 
-    # If spare room, gently grow ability text / padding (prefer readability)
-    for _ in range(6):
-        trial_sizes = dict(sizes)
-        trial_sizes["ability"] = sizes["ability"] + 1
-        trial_F = fonts(trial_sizes)
-        trial_pad = row_pad_y + 1
-        left_h = sum(section_height(t, trial_F, icon_size, trial_pad) for t in left_teams)
-        right_h = sum(section_height(t, trial_F, icon_size, trial_pad) for t in right_teams)
-        if max(left_h, right_h) <= available_h:
-            sizes = trial_sizes
-            F = trial_F
-            row_pad_y = trial_pad
-        else:
-            break
-
-    amw = ability_max_w(icon_size)
-
-    def draw_column(teams: list[str], x: int, y_start: int):
-        y = y_start
-        for team in teams:
+    for _ in range(12):
+        total = 0
+        for team in TEAM_ORDER:
             chars = by_team.get(team, [])
             if not chars:
                 continue
-            color = TEAM_COLOR[team]
-            bar = TEAM_BAR[team]
-            sec_h = section_height(team, F, icon_size, row_pad_y)
+            left_chars, right_chars = split_columns(chars)
+            left_h = sum(row_h(c, icon_size, fonts) + row_gap for c in left_chars)
+            right_h = sum(row_h(c, icon_size, fonts) + row_gap for c in right_chars)
+            total += max(left_h, right_h) + 14
+        if total <= available_h:
+            break
+        icon_size = max(44, icon_size - 2)
+        f_name = font(paths["title_reg"], max(20, f_name.size - 1))
+        f_ability = font(paths["body"], max(15, f_ability.size - 1))
+        fonts = {"name": f_name, "ability": f_ability}
+        row_gap = max(3, row_gap - 1)
 
-            # Strong vertical camp bar
-            bar_img = Image.new("RGBA", (bar_w, sec_h - section_pad), (*bar, 245))
-            img.paste(bar_img, (x, y), bar_img)
-            # Inner highlight on bar
-            ImageDraw.Draw(img).line(
-                [(x + 2, y + 2), (x + 2, y + sec_h - section_pad - 3)],
-                fill=(255, 245, 220, 90),
+    for _ in range(5):
+        trial_ability = font(paths["body"], f_ability.size + 1)
+        trial_fonts = {"name": f_name, "ability": trial_ability}
+        trial_gap = row_gap + 1
+        total = 0
+        for team in TEAM_ORDER:
+            chars = by_team.get(team, [])
+            if not chars:
+                continue
+            left_chars, right_chars = split_columns(chars)
+            left_h = sum(row_h(c, icon_size, trial_fonts) + trial_gap for c in left_chars)
+            right_h = sum(row_h(c, icon_size, trial_fonts) + trial_gap for c in right_chars)
+            total += max(left_h, right_h) + 14
+        if total <= available_h:
+            f_ability = trial_ability
+            fonts = trial_fonts
+            row_gap = trial_gap
+        else:
+            break
+
+    amw = ability_w(icon_size)
+    section_spans: list[tuple[str, int, int]] = []
+
+    def draw_char(ch: dict, x: int, y: int) -> int:
+        team = ch.get("team", "townsfolk")
+        tint = TEAM_COLOR[team]
+        name = ch.get("name", "")
+        ability = ch.get("ability", "")
+        cid = ch.get("id", "")
+        ip = ICON_DIR / f"{cid}.png"
+        if ip.exists():
+            icon = tinted_icon(ip, icon_size, tint)
+        else:
+            icon = Image.new("RGBA", (icon_size, icon_size), (0, 0, 0, 0))
+            ImageDraw.Draw(icon).ellipse(
+                [2, 2, icon_size - 3, icon_size - 3],
+                outline=(*tint, 255),
                 width=2,
             )
 
-            band = Image.new("RGBA", (col_w, header_h), TEAM_HEADER_BG[team])
-            img.paste(band, (x, y), band)
-            draw.text((x + bar_w + 12, y + 3), TEAM_LABEL[team], font=F["section"], fill=color)
-            en_x = x + bar_w + 12 + int(draw.textlength(TEAM_LABEL[team], font=F["section"])) + 10
-            draw.text((en_x, y + 12), TEAM_LABEL_EN[team], font=F["section_en"], fill=(*color, 190))
-            y += header_h + 2
+        text_x = x + icon_size + 10
+        draw.text((text_x, y), name, font=fonts["name"], fill=NAME_COLOR[team])
+        na, nd = fonts["name"].getmetrics()
+        name_h = na + nd
+        lines = wrap_text(ability, fonts["ability"], amw, draw)
+        aa, ad = fonts["ability"].getmetrics()
+        line_h = aa + ad
+        ay0 = y + name_h + 1
+        for i, line in enumerate(lines):
+            draw.text((text_x, ay0 + i * (line_h + ability_gap)), line, font=fonts["ability"], fill=INK)
+        text_h = name_h + 1 + len(lines) * line_h + max(0, len(lines) - 1) * ability_gap
+        rh = max(icon_size, text_h) + row_gap
+        icon_y = y + max(0, (rh - row_gap - icon_size) // 2)
+        img.paste(icon, (x, icon_y), icon)
+        return rh
 
-            for c in chars:
-                name = c.get("name", "")
-                ability = c.get("ability", "")
-                cid = c.get("id", "")
-                icon_path = ICON_DIR / f"{cid}.png"
-                if icon_path.exists():
-                    icon = circular_icon(icon_path, icon_size, bar)
-                else:
-                    icon = Image.new("RGBA", (icon_size, icon_size), (0, 0, 0, 0))
-                    ImageDraw.Draw(icon).ellipse(
-                        [2, 2, icon_size - 3, icon_size - 3],
-                        fill=(220, 200, 170, 255),
-                        outline=(*bar, 255),
-                        width=3,
-                    )
+    y = content_top
+    left_x = content_x
+    right_x = content_x + col_w + gutter
 
-                text_x = x + bar_w + 12 + icon_size + 10
-                draw.text((text_x, y + 1), name, font=F["name"], fill=NAME_COLOR[team])
-                name_h = F["name"].getmetrics()[0] + F["name"].getmetrics()[1]
-                lines = wrap_text(ability, F["ability"], amw, draw)
-                ay = y + name_h + 1
-                ascent, descent = F["ability"].getmetrics()
-                line_h = ascent + descent
-                for i, line in enumerate(lines):
-                    draw.text(
-                        (text_x, ay + i * (line_h + ability_line_gap)),
-                        line,
-                        font=F["ability"],
-                        fill=INK,
-                    )
+    for team in TEAM_ORDER:
+        chars = by_team.get(team, [])
+        if not chars:
+            continue
+        left_chars, right_chars = split_columns(chars)
+        y0 = y
+        y_left = y
+        y_right = y
+        for c in left_chars:
+            y_left += draw_char(c, left_x, y_left)
+        for c in right_chars:
+            y_right += draw_char(c, right_x, y_right)
+        y = max(y_left, y_right)
+        section_spans.append((team, y0, y))
 
-                ability_h = len(lines) * line_h + max(0, len(lines) - 1) * ability_line_gap
-                row_h = max(icon_size, name_h + 1 + ability_h) + row_pad_y
-                icon_y = y + max(0, (row_h - row_pad_y - icon_size) // 2)
-                img.paste(icon, (x + bar_w + 10, icon_y), icon)
-                sep_y = y + row_h - 2
-                draw.line([(text_x, sep_y), (x + col_w - 6, sep_y)], fill=(140, 110, 70, 45), width=1)
-                y += row_h
-            y += section_pad
-        return y
+        if team != TEAM_ORDER[-1]:
+            rule_y = y + 2
+            draw.line(
+                [(content_x, rule_y), (PAGE_W - margin_right, rule_y)],
+                fill=(100, 72, 45, 180),
+                width=2,
+            )
+            # small diamond at rule center (official flourish)
+            mid = (content_x + PAGE_W - margin_right) // 2
+            draw.polygon(
+                [(mid, rule_y - 4), (mid + 5, rule_y), (mid, rule_y + 4), (mid - 5, rule_y)],
+                fill=(100, 72, 45, 200),
+            )
+            y = rule_y + 10
 
-    draw_column(left_teams, margin_x, content_top)
-    draw_column(right_teams, margin_x + col_w + gutter, content_top)
+    if section_spans:
+        bar_top = section_spans[0][1] - 4
+        bar_bottom = section_spans[-1][2] + 2
+        under = Image.new("RGBA", (bar_w, bar_bottom - bar_top), (48, 36, 26, 245))
+        noise = Image.effect_noise((bar_w, bar_bottom - bar_top), 16).convert("L")
+        under = Image.blend(
+            under.convert("RGB"),
+            Image.merge("RGB", (noise, noise, noise)),
+            0.10,
+        ).convert("RGBA")
+        img.paste(under, (bar_x, bar_top), under)
 
-    footer = "Blood on the Clocktower 非官方自定义剧本单 · 角色名称与能力原文取自剧本 JSON · 仅供同好娱乐"
-    fb = draw.textbbox((0, 0), footer, font=F["footer"])
-    fx = (PAGE_W - (fb[2] - fb[0])) // 2
-    draw_ornament_line(draw, margin_x + 80, PAGE_W - margin_x - 80, PAGE_H - margin_bottom + 4, (150, 110, 60))
-    draw.text((fx, PAGE_H - margin_bottom + 14), footer, font=F["footer"], fill=DISCLAIMER)
+        for team, y0, y1 in section_spans:
+            color = TEAM_BAR[team]
+            seg_h = max(1, y1 - y0)
+            # Full-width colored camp segment
+            seg = Image.new("RGBA", (bar_w - 6, seg_h), (*color, 245))
+            img.paste(seg, (bar_x + 3, y0), seg)
+            # Metallic edge
+            ImageDraw.Draw(img).line(
+                [(bar_x + 4, y0 + 2), (bar_x + 4, y1 - 2)],
+                fill=(255, 245, 220, 90),
+                width=2,
+            )
+            ImageDraw.Draw(img).line(
+                [(bar_x + bar_w - 4, y0 + 2), (bar_x + bar_w - 4, y1 - 2)],
+                fill=(0, 0, 0, 50),
+                width=1,
+            )
+            draw_vertical_label(
+                img,
+                TEAM_LABEL[team],
+                (bar_x + 2, y0, bar_x + bar_w - 2, y1),
+                f_bar,
+                (255, 248, 230),
+            )
 
-    frame = ImageDraw.Draw(img)
-    for i, a in enumerate([100, 55, 28]):
-        inset = 24 + i * 3
-        frame.rectangle([inset, inset, PAGE_W - inset, PAGE_H - inset], outline=(118, 78, 38, a), width=2)
+        ImageDraw.Draw(img).rectangle(
+            [bar_x, bar_top, bar_x + bar_w, bar_bottom],
+            outline=(70, 48, 28, 220),
+            width=3,
+        )
+
+    footer = "Blood on the Clocktower 非官方自定义剧本单 · 名称与能力原文取自 JSON · 仅供同好娱乐"
+    fb = draw.textbbox((0, 0), footer, font=f_footer)
+    draw.text(((PAGE_W - (fb[2] - fb[0])) // 2, PAGE_H - 44), footer, font=f_footer, fill=DISCLAIMER)
 
     return img.convert("RGB")
 
 
-def export_pdf(png_path: Path, pdf_path: Path):
+def export_pdf(png_path: Path, pdf_path: Path) -> None:
     c = pdf_canvas.Canvas(str(pdf_path), pagesize=A4)
     w, h = A4
-    margin = 6
+    m = 6
     c.drawImage(
         ImageReader(str(png_path)),
-        margin,
-        margin,
-        width=w - 2 * margin,
-        height=h - 2 * margin,
+        m,
+        m,
+        width=w - 2 * m,
+        height=h - 2 * m,
         preserveAspectRatio=True,
         anchor="c",
     )
@@ -508,7 +574,6 @@ def export_pdf(png_path: Path, pdf_path: Path):
 
 
 def download_icons(timeout: float = 12.0) -> None:
-    """Fetch each character image URL; skip stuck CDN; apply known fallbacks."""
     import ssl
 
     ICON_DIR.mkdir(parents=True, exist_ok=True)
@@ -519,23 +584,23 @@ def download_icons(timeout: float = 12.0) -> None:
         req = urllib.request.Request(
             url,
             headers={
-                "User-Agent": "Mozilla/5.0 (compatible; BotCScriptSheet/1.0)",
+                "User-Agent": "Mozilla/5.0 (compatible; BotCScriptSheet/1.1)",
                 "Accept": "image/*,*/*",
                 "Referer": "https://wiki.biligame.com/",
             },
         )
-        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
-            blob = r.read()
+        with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+            blob = resp.read()
         dest.write_bytes(blob)
         return len(blob)
 
     meta = data[0]
-    if meta.get("logo"):
+    logo = meta.get("logo")
+    if logo:
         try:
-            n = fetch(meta["logo"], ICON_DIR / "_logo.png")
-            print(f"OK logo {n}")
-        except Exception as e:
-            print(f"SKIP logo: {e}")
+            print(f"OK logo {fetch(logo, ICON_DIR / '_logo.png')}")
+        except Exception as exc:
+            print(f"SKIP logo: {exc}")
 
     for ch in data[1:]:
         cid = ch["id"]
@@ -546,21 +611,19 @@ def download_icons(timeout: float = 12.0) -> None:
         ok = False
         for url in urls:
             try:
-                n = fetch(url, dest)
-                print(f"OK {cid} {n}")
+                print(f"OK {cid} {fetch(url, dest)}")
                 ok = True
                 break
-            except Exception as e:
-                print(f"SKIP {cid} ({type(e).__name__}): {url[:70]}")
+            except Exception as exc:
+                print(f"SKIP {cid} ({type(exc).__name__}): {url[:70]}")
         if not ok:
             print(f"MISSING icon for {cid}")
 
 
-def main():
+def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Ensure icons exist (re-fetch missing only)
     missing = [
         c["id"]
         for c in json.loads(JSON_PATH.read_text(encoding="utf-8"))[1:]
@@ -570,11 +633,11 @@ def main():
         print("Downloading missing icons...", missing)
         download_icons()
 
-    print(f"Rendering {PAGE_W}x{PAGE_H} @ {DPI}dpi ...")
+    print(f"Rendering {PAGE_W}x{PAGE_H} @ {DPI}dpi (official TB layout) ...")
     sheet = render()
     png_path = OUT_DIR / "乡巴佬_剧本单.png"
-    pdf_path = OUT_DIR / "乡巴佬_剧本单_A4.pdf"
     hd_path = OUT_DIR / "乡巴佬_剧本单_HD.png"
+    pdf_path = OUT_DIR / "乡巴佬_剧本单_A4.pdf"
 
     sheet.save(png_path, "PNG", dpi=(DPI, DPI), optimize=True)
     sheet.save(hd_path, "PNG", dpi=(DPI, DPI), optimize=True)
@@ -586,11 +649,15 @@ def main():
     sheet.save(art_png, "PNG", dpi=(DPI, DPI), optimize=True)
     export_pdf(png_path, art_pdf)
     preview = sheet.copy()
-    preview.thumbnail((1400, 2000), Image.Resampling.LANCZOS)
+    preview.thumbnail((1300, 1850), Image.Resampling.LANCZOS)
     preview.save(art_preview, "PNG", optimize=True)
 
+    sheet.crop((0, 0, PAGE_W, 520)).save(ARTIFACT_DIR / "qa_header.png")
+    sheet.crop((40, 520, 1260, 1600)).save(ARTIFACT_DIR / "qa_left.png")
+    sheet.crop((1260, 520, PAGE_W - 40, 1600)).save(ARTIFACT_DIR / "qa_right.png")
+    sheet.crop((40, 2400, PAGE_W - 40, PAGE_H - 40)).save(ARTIFACT_DIR / "qa_bottom.png")
+
     print("Wrote:", png_path, png_path.stat().st_size)
-    print("Wrote:", hd_path, hd_path.stat().st_size)
     print("Wrote:", pdf_path, pdf_path.stat().st_size)
 
 
