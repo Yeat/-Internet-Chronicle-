@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>他把 DeepSeek 的核心算子写完，接着说了一句很丧的话</title>
+  <style>
+    :root {
+      --bg: #f3f0ea;
+      --card: #fffcf7;
+      --ink: #22201c;
+      --muted: #6f6962;
+      --line: #e4ddd3;
+      --accent: #8b451f;
+      --quote-bg: #f1ebe2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1000px 520px at 8% -8%, #ebe3d6 0%, transparent 55%),
+        radial-gradient(800px 420px at 100% 0%, #e4eaed 0%, transparent 48%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.8;
+    }
+    .phone {
+      max-width: 680px;
+      margin: 28px auto;
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: 0 16px 40px rgba(40, 30, 20, 0.07);
+      overflow: hidden;
+    }
+    .hero img, .figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .content { padding: 26px 20px 44px; }
+    h1 {
+      font-size: 24px;
+      line-height: 1.4;
+      margin: 0 0 18px;
+      font-weight: 650;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 34px 0 12px;
+      font-weight: 650;
+    }
+    p { margin: 0 0 15px; font-size: 16px; }
+    blockquote {
+      margin: 16px 0;
+      padding: 12px 14px;
+      background: var(--quote-bg);
+      border-left: 3px solid var(--accent);
+      color: #3d3832;
+    }
+    blockquote p { margin: 0; }
+    .meta {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 26px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9em;
+      background: #efe9e0;
+      padding: 0.08em 0.3em;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+  <article class="phone">
+    <div class="hero">
+      <img src="images/cover-bury-talent.jpg" alt="封面" />
+    </div>
+    <div class="content">
+      <h1>他把 DeepSeek 的核心算子写完，接着说了一句很丧的话</h1>
+
+      <p>DeepSeek V4.1 刚出来没多久，网上就传开一篇长文：《我不得不把才华埋葬在昨天》。</p>
+      <p>作者叫刘胜与，DeepSeek 做机器学习系统的工程师。北大图灵班，超算队待过，DeepGEMM、DeepEP 这些底层活也沾过手。更关键的是，V4.1 的主 Attention 算子是他写的。</p>
+      <p>文章一出来就吵得很凶。很多人当成“AI 要抢饭碗”来读。我倒觉得，他真正难受的地方不在失业。</p>
+      <p>他怕的是：活还在，但那份活已经不像从前那样让人上瘾了。</p>
+
+      <h2>失业还早，转业更准</h2>
+      <p>他自己写得很直白：</p>
+      <blockquote><p>我不至于会“失业”，但必须要“转业”。</p></blockquote>
+      <p>以前他那摊事挺顺的。爱写算子，也写得好，公司刚好就缺会抠 GPU 性能的人。兴趣、本事、饭碗，大致在一条线上。</p>
+      <p>现在这条线拧了。</p>
+      <p>AI 开始会写他擅长的东西；公司要的也不再只是“会手写高性能算子的人”，而是“能带着 AI 更快把算子做出来的人”。人还得留在场上，但上场方式变了：少自己一行行敲，多去指挥 Agent——他管这叫“机甲驾驶员”。</p>
+      <p>标题里的“埋葬才华”，其实不是说自己忽然废了。更像是在说：那套曾经很吃香、也很让他开心的本事，正在变成旧时代的技能。</p>
+      <blockquote><p>我的手中多了些齿轮，但心中少了些节拍。</p></blockquote>
+      <p>齿轮大概是工具、流程、Agent。<br />节拍，大概是那一下午安安静静写算子、看着性能往上冒的劲儿。</p>
+
+      <h2>他写的到底是什么活</h2>
+      <p>外面聊大模型，通常停在“模型又更强了”。刘胜与这类人干的，是更闷的一层：怎么让模型在 GPU 上跑得动，而且尽量跑满。</p>
+      <p>算子可以粗暴理解成 GPU 上的重活内核。Attention、矩阵乘、MoE 通信，全靠这些东西一点点把芯片压出油水。</p>
+      <div class="figure"><img src="images/gpu-kernel-layers.jpg" alt="GPU 栈" /></div>
+      <p>文里有个细节很能说明他站在哪一层。他说，AI 已经能读 CUDA、PTX、SASS，还能拿专业工具看指令停顿，自己动手优化。</p>
+      <p>CUDA 是人常写的那层。PTX 往下走一点。SASS 是机器码，基本就是编译完真正在卡上跑的东西。真要抠到极限，常常得看寄存器有没有炸、指令有没有双发起来、内存是不是把流水线拖死了。</p>
+      <p>再说 V4.1 那个主 Attention。公开材料里能看到 MQA、head 维度拉到 512，再叠低精度 KV、稀疏索引一类设计，基本没法靠套现成模板糊弄过去。所以他提一句“主 Attention 是我写的”，分量不轻。</p>
+      <p>他自己也清楚另一个更别扭的事实：算子写得越快，模型迭代越猛，AI 追上他的日子也越近。</p>
+
+      <h2>“革我命的人希望是我自己”</h2>
+      <p>为什么还继续写？一部分很简单：爱。他把写算子比成打游戏。另一部分更冷：你摆烂，别的公司不会摆烂。</p>
+      <blockquote><p>我当然希望自己不要被革命，但如果非被革命不可的话，我希望革我自己命的人是我自己。</p></blockquote>
+      <p>他估了个时间：再过半年到一年，AI 写算子大概就能追上他。日期不必抠死。能编译、能量测、对错清楚的优化活上，Agent 已经很能打；还没完全交出去的，多半是定方案和做验收。</p>
+
+      <h2>驾驶员这活，听着酷，做起来未必爽</h2>
+      <div class="figure"><img src="images/mecha-pilot-desk.jpg" alt="机甲驾驶员" /></div>
+      <p>转业不是转行。还是算子，还是性能，只是人退半步：先把目标、约束、红线说清楚，Agent 去生成和试错，人盯着靠不靠谱。</p>
+      <p>有同行留言：现在写 Attention，除了方案不能替我定，别的 Agent 都能帮，又快又好。这几乎就是他说的那个过渡态。</p>
+
+      <h2>织毛衣那个比方，比失业论扎人</h2>
+      <div class="figure"><img src="images/window-knitting-machine.jpg" alt="织毛衣" /></div>
+      <p>你手艺很好，坐窗边一下午就织过去了。后来机器来了，又快又好。你也得用，说不定还压得过同行。可那种临窗听雨、一针一线的意思，没了。</p>
+      <p>文章真正扎人的地方，大概就在这儿。饭碗问题大家听得多了；更麻烦的是，工作还在发工资，却不再确认“我是靠这件事活着的那种人”。</p>
+
+      <h2>后半截忽然抬高，但并不突兀</h2>
+      <p>学生面对 Lab：自己抠八小时，或者花几分钟让模型交卷。他担心工程能力被掏空。人本来就不会，再配上 AI，堆屎山的速度能快好几倍。</p>
+      <p>然后他问：未来是不是权力比技术或智商更重要。</p>
+      <div class="figure"><img src="images/two-futures-fork.jpg" alt="两条路" /></div>
+      <p>结尾他把未来掰成两极，一边开放普惠，一边少数人锁死最强 AI。后来他又补充：主要不是贩焦虑，就是想跟过去那段手写算子的日子说再见。</p>
+
+      <p>说到底，这篇文章刺人的地方很具体。不是“所有人明天没工作”，而是一个刚打完胜仗的人承认：自己最拿手、也最喜欢的那种干法，正在过时。人也许还能留在牌桌上，但得换坐姿；换完以后，桌上的筹码还在，手感不一定还在。</p>
+      <p>半年也好，一年也好，日子未必准。可那种“还干得动，已经不那么像从前那样爱了”的别扭，恐怕会先一步到来。</p>
+
+      <div class="meta">配图为概念插画。正式发布请上传 images/ 内图片至公众号素材库。</div>
+    </div>
+  </article>
+</body>
+</html>
