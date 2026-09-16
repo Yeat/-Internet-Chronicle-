@@ -4,10 +4,13 @@
 
 ## 快速开始
 
-1. 解压或打开本目录
-2. 浏览器打开 `paste-to-wechat.html`，全选复制
-3. 粘贴到 [mp.weixin.qq.com](https://mp.weixin.qq.com) 草稿箱
-4. 封面与插图用 `images/01`～`05`
+**方式 A：本地 Cursor Agent 代发（推荐）**  
+打开本仓库后，按 `本地Agent操作.md` 把提示词发给本机 Agent；扫码登录由你完成。
+
+**方式 B：自己粘贴**
+1. 浏览器打开 `paste-to-wechat.html`，全选复制
+2. 粘贴到 [mp.weixin.qq.com](https://mp.weixin.qq.com) 草稿箱
+3. 封面与插图用 `images/01`～`05`
 
 ## 文件
 
