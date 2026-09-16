@@ -1,0 +1,139 @@
+<section id="wechat-article" style="max-width:677px;margin:0 auto;padding:0;color:#333;font-size:16px;line-height:1.8;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Hiragino Sans GB','Microsoft YaHei',sans-serif;letter-spacing:0.3px;">
+
+<p style="margin:0 0 20px;text-align:center;">
+  <img src="images/01-cover.jpg" alt="封面" style="width:100%;display:block;border:0;" />
+</p>
+
+<p style="margin:0 0 18px;">DeepSeek V4.1 刚出来没多久，网上就传开一篇长文：《我不得不把才华埋葬在昨天》。</p>
+
+<p style="margin:0 0 18px;">作者叫刘胜与，DeepSeek 做机器学习系统的工程师。北大图灵班，超算队待过，DeepGEMM、DeepEP 这些底层活也沾过手。更关键的是，V4.1 的主 Attention 算子是他写的。</p>
+
+<p style="margin:0 0 18px;">文章一出来就吵得很凶。很多人当成“AI 要抢饭碗”来读。我倒觉得，他真正难受的地方不在失业。</p>
+
+<p style="margin:0 0 28px;">他怕的是：活还在，但那份活已经不像从前那样让人上瘾了。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">失业还早，转业更准</p>
+
+<p style="margin:0 0 18px;">他自己写得很直白：</p>
+
+<section style="margin:0 0 18px;padding:12px 14px;background:#f7f4ef;border-left:3px solid #8b451f;color:#444;">
+  <p style="margin:0;">我不至于会“失业”，但必须要“转业”。</p>
+</section>
+
+<p style="margin:0 0 18px;">以前他那摊事挺顺的。爱写算子，也写得好，公司刚好就缺会抠 GPU 性能的人。兴趣、本事、饭碗，大致在一条线上。</p>
+
+<p style="margin:0 0 18px;">现在这条线拧了。</p>
+
+<p style="margin:0 0 18px;">AI 开始会写他擅长的东西；公司要的也不再只是“会手写高性能算子的人”，而是“能带着 AI 更快把算子做出来的人”。人还得留在场上，但上场方式变了：少自己一行行敲，多去指挥 Agent——他管这叫“机甲驾驶员”。</p>
+
+<p style="margin:0 0 18px;">标题里的“埋葬才华”，其实不是说自己忽然废了。更像是在说：那套曾经很吃香、也很让他开心的本事，正在变成旧时代的技能。</p>
+
+<p style="margin:0 0 18px;">后面还有一句，很多人截图：</p>
+
+<section style="margin:0 0 18px;padding:12px 14px;background:#f7f4ef;border-left:3px solid #8b451f;color:#444;">
+  <p style="margin:0;">我的手中多了些齿轮，但心中少了些节拍。</p>
+</section>
+
+<p style="margin:0 0 8px;">齿轮大概是工具、流程、Agent。</p>
+<p style="margin:0 0 28px;">节拍，大概是那一下午安安静静写算子、看着性能往上冒的劲儿。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">他写的到底是什么活</p>
+
+<p style="margin:0 0 18px;">外面聊大模型，通常停在“模型又更强了”。刘胜与这类人干的，是更闷的一层：怎么让模型在 GPU 上跑得动，而且尽量跑满。</p>
+
+<p style="margin:0 0 18px;">算子可以粗暴理解成 GPU 上的重活内核。Attention、矩阵乘、MoE 通信，全靠这些东西一点点把芯片压出油水。正确性要过，访存要顺，流水线不能歇着，还得跟每一代硬件的脾气磨合。</p>
+
+<p style="margin:0 0 20px;text-align:center;">
+  <img src="images/02-gpu-layers.jpg" alt="GPU 栈" style="width:100%;display:block;border:0;" />
+</p>
+
+<p style="margin:0 0 18px;">文里有个细节很能说明他站在哪一层。他说，AI 已经能读 CUDA、PTX、SASS，还能拿专业工具看指令停顿，自己动手优化。</p>
+
+<p style="margin:0 0 18px;">CUDA 是人常写的那层。PTX 往下走一点，到了中间表示。SASS 则是机器码，基本就是“编译完真正在卡上跑的东西”。很多会写 CUDA 的人，未必天天盯 SASS；可真要抠到极限，常常得看寄存器有没有炸、指令有没有双发起来、内存是不是把流水线拖死了。</p>
+
+<p style="margin:0 0 18px;">模型如果连这层都能啃，说明它已经摸到过去少数内核工程师才泡着的地方。</p>
+
+<p style="margin:0 0 18px;">再说 V4.1 那个主 Attention。公开材料里能看到，DeepSeek 为了长上下文做了压缩、稀疏一类设计；核心 attention 走 MQA，head 维度还拉到 512。这东西不好写。Q 侧头多，K/V 很瘦，算起来跟普通注意力不是一个手感；头一宽，寄存器和共享内存立刻紧张；再叠低精度 KV、稀疏索引、paged decode，基本没法靠“套个现成 FlashAttention 模板”糊弄过去。</p>
+
+<p style="margin:0 0 18px;">所以他提一句“主 Attention 是我写的”，分量不轻。模型上下文拉长之后还想又快又省，底下总得有人把这类内核啃下来。</p>
+
+<p style="margin:0 0 28px;">他自己也清楚另一个更别扭的事实：算子写得越快，训练和推理越便宜，模型迭代越猛，AI 追上他的日子也越近。Infra 的人，某种程度上一直在给后面那只老虎喂食。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">“革我命的人希望是我自己”</p>
+
+<p style="margin:0 0 18px;">他为什么还继续写？</p>
+
+<p style="margin:0 0 18px;">一部分很简单：爱。他把写算子比成打游戏。搞出新招数、性能曲线往上翘、甚至压过厂商官方实现时，兴奋得像破纪录。</p>
+
+<p style="margin:0 0 18px;">另一部分更冷：你摆烂，别的公司不会摆烂。停手救不了旧世界。</p>
+
+<p style="margin:0 0 18px;">所以才有这句：</p>
+
+<section style="margin:0 0 18px;padding:12px 14px;background:#f7f4ef;border-left:3px solid #8b451f;color:#444;">
+  <p style="margin:0;">我当然希望自己不要被革命，但如果非被革命不可的话，我希望革我自己命的人是我自己。</p>
+</section>
+
+<p style="margin:0 0 18px;">这话听着热血，其实挺无奈。与其等别人的模型连同 Agent 一起把自己掀翻，不如自己先把新流程跑起来。</p>
+
+<p style="margin:0 0 28px;">他估了个时间：再过半年到一年，AI 写算子大概就能追上他，甚至超过他。日期不必抠死。眼下更贴近现实的判断大概是：在能编译、能量测、对错清楚的优化活上，Agent 已经很能打；真正还没完全交出去的，是新架构刚出来时怎么定方案，以及最后怎么验收——是真接近硬件极限，还是只在固定 shape 上刷分。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">驾驶员这活，听着酷，做起来未必爽</p>
+
+<p style="margin:0 0 20px;text-align:center;">
+  <img src="images/03-mecha-pilot.jpg" alt="机甲驾驶员" style="width:100%;display:block;border:0;" />
+</p>
+
+<p style="margin:0 0 18px;">转业，不是转行去干别的。还是算子，还是性能，只是人退半步。</p>
+
+<p style="margin:0 0 8px;">以前大概是：自己想调度，自己写，自己抠。</p>
+<p style="margin:0 0 18px;">以后更可能是：人先把目标、约束、红线说清楚，Agent 去生成、试错、改；人盯着方案靠不靠谱、有没有偷鸡、能不能上线。</p>
+
+<p style="margin:0 0 18px;">有同行留言，说得挺实在：现在写 Attention，除了方案不能替我定，别的 Agent 都能帮，又快又好。这几乎就是刘胜与说的那个过渡态。</p>
+
+<p style="margin:0 0 28px;">当然也有更刺的看法。要是连系统设计的“品味”都能被有反馈的强化学习慢慢学走，驾驶员也不见得能坐很久。文章在“转业还能吃饭”这儿收住了；评论区则把时间又往前拨了一点。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">织毛衣那个比方，比失业论扎人</p>
+
+<p style="margin:0 0 20px;text-align:center;">
+  <img src="images/04-knitting.jpg" alt="织毛衣" style="width:100%;display:block;border:0;" />
+</p>
+
+<p style="margin:0 0 18px;">文里最好的一段，其实不是技术推演，是织毛衣。</p>
+
+<p style="margin:0 0 18px;">你手艺很好，坐窗边，茶放着，外面山和水，一下午就织过去了。后来机器来了，又快又好。你也得用。凭旧功底，用机器你说不定还压得过同行。可那种临窗听雨、一针一线的意思，没了。</p>
+
+<p style="margin:0 0 18px;">他拿自己搬出租屋还大哭一场来比。人明明知道该走，身体还是跟那段日子较劲。今天要跟“手写算子、人脑优化”告别，他觉得比搬家难受。</p>
+
+<p style="margin:0 0 28px;">文章真正扎人的地方，大概就在这儿。饭碗问题大家听得多了；更麻烦的是，工作还在发工资，却不再确认“我是靠这件事活着的那种人”。</p>
+
+<p style="margin:28px 0 16px;font-size:18px;font-weight:600;color:#222;">后半截忽然抬高，但并不突兀</p>
+
+<p style="margin:0 0 18px;">写完自己以后，他开始瞎操心别人。</p>
+
+<p style="margin:0 0 18px;">学生面对 Lab：自己抠八小时，或者花几分钟让模型交卷。大多数人会怎么选，几乎不用猜。他担心的不是大家会用工具，而是工程能力会不会被掏空——代码怎么组织、系统怎么搭、需求变了会不会提前留后手。这些东西，到底会像手写 x86 一样慢慢边缘化，还是像“懂整机”一样继续值钱？</p>
+
+<p style="margin:0 0 18px;">若是后者，局面就难看了。人本来就不会，再配上 AI，堆屎山的速度能快好几倍。落到 GPU 上，可能是隐蔽竞态、只对几个 shape 快的内核，或者训练看着漂亮、线上动不动抖一下。</p>
+
+<p style="margin:0 0 18px;">然后他问了一句更野的：</p>
+
+<section style="margin:0 0 18px;padding:12px 14px;background:#f7f4ef;border-left:3px solid #8b451f;color:#444;">
+  <p style="margin:0;">在未来社会中，权力（power）是不是会比技术或智商更加重要？</p>
+</section>
+
+<p style="margin:0 0 18px;">手写门槛一低，比拼很容易滑向另一边：谁手里有更强的模型，谁有算力，谁能决定分发。</p>
+
+<p style="margin:0 0 20px;text-align:center;">
+  <img src="images/05-two-futures.jpg" alt="两条路" style="width:100%;display:block;border:0;" />
+</p>
+
+<p style="margin:0 0 18px;">结尾他把未来掰成两极，一边偏开放普惠，一边偏少数公司锁死最强 AI。他不信 Anthropic、OpenAI 会把最前沿智能廉价铺开，所以留在 DeepSeek，想着开源也许能把世界从更糟的那边拽回来一点。</p>
+
+<p style="margin:0 0 28px;">后来他又补充过：写这篇东西，主要不是贩焦虑，也不是为了点谁的名，就是想跟过去那段手写算子的日子说再见。算子他还写，Agent 也会继续引进来；只是对“工作和爱好能不能长期捆在一起”，他不乐观。</p>
+
+<p style="margin:0 0 18px;">说到底，这篇文章刺人的地方很具体。</p>
+
+<p style="margin:0 0 18px;">不是“所有人明天没工作”，而是一个刚打完胜仗的人承认：自己最拿手、也最喜欢的那种干法，正在过时。人也许还能留在牌桌上，但得换坐姿；换完以后，桌上的筹码还在，手感不一定还在。</p>
+
+<p style="margin:0 0 8px;">半年也好，一年也好，日子未必准。可那种“还干得动，已经不那么像从前那样爱了”的别扭，恐怕会先一步到来。</p>
+
+</section>
