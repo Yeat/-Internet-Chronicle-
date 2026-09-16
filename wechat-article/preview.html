@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>他把 DeepSeek 的核心算子写完后，说：我不得不把才华埋葬在昨天</title>
+  <style>
+    :root {
+      --bg: #f7f4ef;
+      --card: #fffdf9;
+      --ink: #1c1a17;
+      --muted: #6b6560;
+      --line: #e7e1d8;
+      --accent: #9a4d2e;
+      --quote-bg: #f3eee6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #efe6d8 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #e8eef1 0%, transparent 50%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Source Han Serif SC", "Noto Serif SC", "Songti SC", Georgia, serif;
+      line-height: 1.85;
+    }
+    .phone {
+      max-width: 680px;
+      margin: 32px auto;
+      background: var(--card);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 50px rgba(40, 30, 20, 0.08);
+      overflow: hidden;
+    }
+    .hero img, .figure img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .content {
+      padding: 28px 22px 48px;
+    }
+    h1 {
+      font-size: 26px;
+      line-height: 1.35;
+      margin: 0 0 14px;
+      letter-spacing: 0.01em;
+    }
+    .dek {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 {
+      font-size: 20px;
+      margin: 36px 0 14px;
+      letter-spacing: 0.02em;
+    }
+    h3 {
+      font-size: 17px;
+      margin: 24px 0 10px;
+    }
+    p { margin: 0 0 16px; font-size: 16px; }
+    .caption {
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+      margin: 8px 0 22px;
+      font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+    blockquote {
+      margin: 18px 0;
+      padding: 14px 16px;
+      background: var(--quote-bg);
+      border-left: 3px solid var(--accent);
+      color: #3a342e;
+    }
+    blockquote p { margin: 0 0 8px; }
+    blockquote p:last-child { margin: 0; }
+    ul, ol { padding-left: 1.2em; margin: 0 0 16px; }
+    li { margin-bottom: 8px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0 0 18px;
+      font-size: 14px;
+      font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f6f1ea; }
+    .meta {
+      font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+    }
+    strong { font-weight: 700; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+      background: #f1ece4;
+      padding: 0.1em 0.35em;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <article class="phone">
+    <div class="hero">
+      <img src="images/cover-bury-talent.jpg" alt="封面：工程师与即将远去的手艺时代" />
+    </div>
+    <div class="content">
+      <h1>他把 DeepSeek 的核心算子写完后，说：我不得不把才华埋葬在昨天</h1>
+      <div class="dek">不会失业，但必须转业。<br />饭碗还在，清欢没了。</div>
+
+      <p>前几天，DeepSeek V4.1 发布。</p>
+      <p>几乎同一时间，一位亲手写下其主 Attention 算子的工程师，发了一篇三千字长文——《我不得不把才华埋葬在昨天》。</p>
+      <p>作者是 DeepSeek 机器学习系统（MLSys）工程师<strong>刘胜与</strong>。北大图灵班出身，做过超算，写过 DeepGEMM，参与过 DeepEP，又把 V4.1 的核心注意力内核交了出去。</p>
+      <p>也就是说：他不是在围观 AI 抢饭碗。<br />他是在说——<strong>铸造引擎的人，最先听见引擎碾过自己的声音。</strong></p>
+      <p>这篇文章刷屏，不是因为又一篇“AI 焦虑”。<br />而是因为它把一件更刺人的事说清楚了：</p>
+      <p><strong>岗位可能还在，手艺人的时代结束了。</strong></p>
+
+      <h2>01｜真正怕的不是失业，是热爱错位</h2>
+      <p>刘胜与的判断很干净：</p>
+      <blockquote><p>我不至于“失业”，但必须“转业”。</p></blockquote>
+      <p>失业，是没席位。<br />转业，是席位还在，<strong>工作的做法彻底变了</strong>。</p>
+      <p>过去，三件事基本对齐：他感兴趣的、他擅长的、工业界需要的。<br />现在，AI 让擅长变成了它更擅长的；需求也从“会写算子的人”，漂到了“能用 AI 更快产出高性能算子的人”。</p>
+      <p>于是他要去做 Agent 的<strong>“机甲驾驶员”</strong>。</p>
+      <blockquote>
+        <p>我不得不把才华埋葬在昨天，去做一位机甲驾驶员。</p>
+        <p>我的手中多了些齿轮，但心中少了些节拍。</p>
+      </blockquote>
+
+      <h2>02｜他到底在优化什么</h2>
+      <p>算法定“算什么”，系统工程师定“在硅片上怎么算到接近极限”。算子就是 Attention、矩阵乘、MoE 通信这些跑在 GPU 上的重活。</p>
+      <div class="figure"><img src="images/gpu-kernel-layers.jpg" alt="GPU 编程栈三层" /></div>
+      <p class="caption">从源码到中间表示，再到机器码——顶尖优化往往要一路钻下去。</p>
+      <p>文中提到 AI 已能阅读 <strong>CUDA、PTX、SASS</strong>：从人写的程序，到中间指令，再到真正的机器码，并分析停顿、独立优化。</p>
+      <p>V4.1 主 Attention 还涉及 <strong>MQA</strong> 与很大的 <code>head_dim = 512</code>，再叠加低精度 KV、稀疏索引等，远不是套模板能交差。Infra 每快一点，模型迭代就陡一点——写内核的人，其实一直在给“取代自己的东西”加油。</p>
+
+      <h2>03｜希望革我命的人是我自己</h2>
+      <p>算子越好 → 训练推理越快 → 模型越强 → AI 写算子越强 → 自己被替代越早。</p>
+      <blockquote><p>我当然希望自己不要被革命，但如果非被革命不可的话，我希望革我自己命的人是我自己。</p></blockquote>
+      <p>这是军备竞赛里的理性选择：与其被动出局，不如主动转业。</p>
+
+      <h2>04｜机甲驾驶员</h2>
+      <div class="figure"><img src="images/mecha-pilot-desk.jpg" alt="机甲驾驶员" /></div>
+      <p class="caption">人不再逐行敲指令，而是设定边界、指挥机器臂去写。</p>
+      <p><strong>过去：</strong>人脑设计 → 手写实现 → 手工抠性能<br /><strong>以后：</strong>人对齐目标与约束 → Agent 生成试错 → 人做品味、边界、验收</p>
+
+      <h2>05｜织毛衣那段，才是全文最疼的地方</h2>
+      <div class="figure"><img src="images/window-knitting-machine.jpg" alt="织毛衣与机器" /></div>
+      <p class="caption">质量也许还能赢，意趣却被轰鸣碾碎了。</p>
+      <p>人不仅靠工作吃饭，还靠工作确认“我是谁”。<strong>保住的是产出，失去的是主体感。</strong></p>
+
+      <h2>06｜他担心的是整个工程根基</h2>
+      <p>学生若普遍用 AI 交 Lab，工程能力可能空心化。低能力乘上 AI，只会更高效地制造系统性屎山。他也追问：未来是不是权力比技术或智商更重要。</p>
+
+      <h2>07｜结尾为什么站到开源这一边</h2>
+      <div class="figure"><img src="images/two-futures-fork.jpg" alt="两条未来" /></div>
+      <p class="caption">智能足够强之后，问题很快从技术变成分配。</p>
+      <p>一端是普惠基础设施，一端是少数人锁住最强 AI。作者后来补充：写这篇文章，主要是想和手写算子的时光说再见。</p>
+
+      <h2>08｜可以带走的三句话</h2>
+      <ol>
+        <li><strong>岗位可能还在，手艺人的时代结束了。</strong></li>
+        <li><strong>最危险的不是被取代，而是兴趣、能力、市场需求永久错位。</strong></li>
+        <li><strong>当最底层手艺也可自动化，竞争上移到谁拥有、谁开放最强智能。</strong></li>
+      </ol>
+
+      <p>你赢了技术，却输了自己安放才华的方式。<br />齿轮会更多。节拍感，要重新找。</p>
+      <blockquote><p>手中多了些齿轮，心中少了些节拍。</p></blockquote>
+      <p>愿我们在转业之后，还能找回新的节拍。</p>
+
+      <div class="meta">
+        配图为编辑概念插画，便于排版预览。正式发布请将 images/ 内图片上传至公众号素材库后替换。
+      </div>
+    </div>
+  </article>
+</body>
+</html>
